@@ -73,7 +73,7 @@ function generatePuzzle() {
   let bestEntries = [];
   let bestQuality = -1;
 
-  for (let attempt = 0; attempt < 25; attempt++) {
+  for (let attempt = 0; attempt < 100; attempt++) {
     const grid = Array.from({ length: rows }, () =>
       Array.from({ length: cols }, () => ({
         type: "empty",
@@ -123,8 +123,11 @@ function generatePuzzle() {
         }
       }
 
-      if (requireCrossing && crossings === 0) return 0;
-      return crossings;
+     
+
+
+if (requireCrossing && crossings === 0) return 0;
+return crossings;
     }
 
     function addEntry(entry) {
@@ -161,13 +164,13 @@ function generatePuzzle() {
 
     const seed = seeds[Math.floor(random() * seeds.length)];
 
-    addEntry({
-      direction: "across",
-      clueRow: Math.floor(rows / 2),
-      clueCol: Math.floor((cols - seed.answer.length - 1) / 2),
-      clue: seed.clue,
-      answer: seed.answer
-    });
+   addEntry({
+  direction: "across",
+  clueRow: Math.floor(rows / 2),
+  clueCol: cols - seed.answer.length - 1,
+  clue: seed.clue,
+  answer: seed.answer
+});
 
     while (placed.length < targetWords) {
       let bestCandidate = null;
@@ -609,6 +612,8 @@ render();
 /* Grid zoom controls */
 
 /* Grid zoom controls */
+
+/* Grid zoom controls and touch gestures */
 const gridViewport = document.querySelector(".grid-viewport");
 const zoomInButton = document.getElementById("zoom-in");
 const zoomOutButton = document.getElementById("zoom-out");
@@ -616,24 +621,65 @@ const zoomResetButton = document.getElementById("zoom-reset");
 const zoomGrid = document.getElementById("grid");
 
 let zoomLevel = 1;
+const minZoom = 1;
+const maxZoom = 2.5;
+const activePointers = new Map();
+
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
+let pinchContentX = 0;
+let pinchContentY = 0;
+let pinchMidX = 0;
+let pinchMidY = 0;
+
+let panPointerId = null;
+let panStartX = 0;
+let panStartY = 0;
+let panScrollLeft = 0;
+let panScrollTop = 0;
+let didPan = false;
+let suppressClick = false;
 
 function updateZoom() {
   zoomGrid.style.zoom = "";
+  zoomGrid.style.transformOrigin = "top left";
   zoomGrid.style.transform = `scale(${zoomLevel})`;
 
   zoomResetButton.textContent = `${Math.round(zoomLevel * 100)} %`;
-  zoomInButton.disabled = zoomLevel >= 2.5;
-  zoomOutButton.disabled = zoomLevel <= 1;
+  zoomInButton.disabled = zoomLevel >= maxZoom;
+  zoomOutButton.disabled = zoomLevel <= minZoom;
+}
+
+function setZoom(newZoom, anchorX, anchorY) {
+  const oldZoom = zoomLevel;
+  const newLevel = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+  if (newLevel === oldZoom) return;
+
+  const contentX = (gridViewport.scrollLeft + anchorX) / oldZoom;
+  const contentY = (gridViewport.scrollTop + anchorY) / oldZoom;
+
+  zoomLevel = newLevel;
+  updateZoom();
+
+  gridViewport.scrollLeft = contentX * zoomLevel - anchorX;
+  gridViewport.scrollTop = contentY * zoomLevel - anchorY;
 }
 
 zoomInButton.addEventListener("click", () => {
-  zoomLevel = Math.min(2.5, zoomLevel + 0.25);
-  updateZoom();
+  setZoom(
+    zoomLevel + 0.25,
+    gridViewport.clientWidth / 2,
+    gridViewport.clientHeight / 2
+  );
 });
 
 zoomOutButton.addEventListener("click", () => {
-  zoomLevel = Math.max(1, zoomLevel - 0.25);
-  updateZoom();
+  setZoom(
+    zoomLevel - 0.25,
+    gridViewport.clientWidth / 2,
+    gridViewport.clientHeight / 2
+  );
 });
 
 zoomResetButton.addEventListener("click", () => {
@@ -641,5 +687,138 @@ zoomResetButton.addEventListener("click", () => {
   updateZoom();
   gridViewport.scrollTo({ left: 0, top: 0, behavior: "smooth" });
 });
+
+function pointerDistance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function pointerMidpoint(a, b) {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2
+  };
+}
+
+gridViewport.addEventListener("pointerdown", (event) => {
+  activePointers.set(event.pointerId, {
+    x: event.clientX,
+    y: event.clientY
+  });
+
+  if (activePointers.size === 2) {
+    const points = [...activePointers.values()];
+    const rect = gridViewport.getBoundingClientRect();
+    const midpoint = pointerMidpoint(points[0], points[1]);
+
+    pinchStartDistance = pointerDistance(points[0], points[1]);
+    pinchStartZoom = zoomLevel;
+    pinchMidX = midpoint.x - rect.left;
+    pinchMidY = midpoint.y - rect.top;
+    pinchContentX = (gridViewport.scrollLeft + pinchMidX) / zoomLevel;
+    pinchContentY = (gridViewport.scrollTop + pinchMidY) / zoomLevel;
+
+    panPointerId = null;
+  } else if (activePointers.size === 1) {
+    panPointerId = event.pointerId;
+    panStartX = event.clientX;
+    panStartY = event.clientY;
+    panScrollLeft = gridViewport.scrollLeft;
+    panScrollTop = gridViewport.scrollTop;
+    didPan = false;
+  }
+});
+
+gridViewport.addEventListener("pointermove", (event) => {
+  if (!activePointers.has(event.pointerId)) return;
+
+  activePointers.set(event.pointerId, {
+    x: event.clientX,
+    y: event.clientY
+  });
+
+  if (activePointers.size >= 2) {
+    const points = [...activePointers.values()];
+    const distance = pointerDistance(points[0], points[1]);
+
+    if (pinchStartDistance > 0) {
+      const nextZoom =
+        pinchStartZoom * (distance / pinchStartDistance);
+
+      const newLevel = Math.max(
+        minZoom,
+        Math.min(maxZoom, nextZoom)
+      );
+
+      zoomLevel = newLevel;
+      updateZoom();
+
+      gridViewport.scrollLeft =
+        pinchContentX * zoomLevel - pinchMidX;
+
+      gridViewport.scrollTop =
+        pinchContentY * zoomLevel - pinchMidY;
+    }
+
+    event.preventDefault();
+    return;
+  }
+
+  if (event.pointerId === panPointerId && zoomLevel > 1) {
+    const dx = event.clientX - panStartX;
+    const dy = event.clientY - panStartY;
+
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      didPan = true;
+    }
+
+    if (didPan) {
+      gridViewport.scrollLeft = panScrollLeft - dx;
+      gridViewport.scrollTop = panScrollTop - dy;
+      event.preventDefault();
+    }
+  }
+});
+
+function endPointer(event) {
+  activePointers.delete(event.pointerId);
+
+  if (didPan) {
+    suppressClick = true;
+    setTimeout(() => {
+      suppressClick = false;
+    }, 0);
+  }
+
+  if (activePointers.size < 2) {
+    pinchStartDistance = 0;
+  }
+
+  if (activePointers.size === 0) {
+    panPointerId = null;
+    didPan = false;
+  } else if (activePointers.size === 1) {
+    const remaining = [...activePointers.entries()][0];
+    panPointerId = remaining[0];
+    panStartX = remaining[1].x;
+    panStartY = remaining[1].y;
+    panScrollLeft = gridViewport.scrollLeft;
+    panScrollTop = gridViewport.scrollTop;
+  }
+}
+
+gridViewport.addEventListener("pointerup", endPointer);
+gridViewport.addEventListener("pointercancel", endPointer);
+
+gridViewport.addEventListener(
+  "click",
+  (event) => {
+    if (suppressClick) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressClick = false;
+    }
+  },
+  true
+);
 
 updateZoom();
