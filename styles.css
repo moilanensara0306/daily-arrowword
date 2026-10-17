@@ -98,7 +98,7 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
-  width: min(100%, 270px);
+  width: min(100%, 620px);
   margin: 20px auto;
 }
 
@@ -256,4 +256,166 @@ footer {
 
 .mobile-key.wide {
   grid-column: span 2;
+}
+
+
+/* Arrowword grid improvements */
+
+.grid {
+  width: min(100%, 420px);
+  gap: 3px;
+  margin: 20px auto;
+}
+
+.cell {
+  min-width: 0;
+  border-radius: 4px;
+  font-size: clamp(18px, 4.5vw, 26px);
+  overflow: hidden;
+}
+
+.blocked {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+
+.clue-cell {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px;
+  background: #e8e5d8;
+  border-color: #c9c5b5;
+  color: #30352d;
+  text-align: left;
+}
+
+.clue-cell.selected-clue {
+  background: #d8e8ce;
+  border-color: #4f7d4b;
+  box-shadow: inset 0 0 0 1px #4f7d4b;
+}
+
+.clue-arrow {
+  display: block;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.clue-cell-text {
+  display: block;
+  width: 100%;
+  font-size: clamp(10px, 2.2vw, 13px);
+  line-height: 1.2;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  overflow: hidden;
+}
+
+.letter-cell {
+  background: #fff;
+}
+
+.letter-cell.selected-word {
+  background: #fff0b3;
+  border-color: #e4c75d;
+}
+
+.letter-cell.active {
+  background: #cfe5c6;
+  border-color: #355b3b;
+  box-shadow: inset 0 0 0 1px #355b3b;
+}
+
+.letter-cell.correct {
+  background: #d9efda;
+  border-color: #83b487;
+}
+
+.clue.active-clue {
+  border-color: #4f7d4b;
+  background: #edf5e8;
+}
+
+/* Keep clues inside the puzzle grid */
+.clues {
+  display: none;
+}
+
+.game {
+  width: 100%;
+  max-width: 900px;
+  margin-inline: auto;
+  overflow: visible;
+}
+
+.grid {
+  width: min(100%, 620px);
+  max-width: 100%;
+  margin: 20px auto;
+  transform: none;
+}
+
+.clue-arrow {
+  display: none;
+}
+
+.clue-cell {
+  justify-content: center;
+  padding: 4px;
+  gap: 0;
+}
+
+
+/* Zoom controls */
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.zoom-controls button {
+  min-width: 44px;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid #c9c5b5;
+  border-radius: 8px;
+  background: #f7f5ef;
+  color: #30352d;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.zoom-controls button:active {
+  background: #d8e8ce;
+}
+
+.grid-viewport {
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 auto;
+}
+
+.grid-viewport {
+  position: relative;
+  width: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.grid-viewport .grid {
+  transform-origin: top left;
+  flex-shrink: 0;
 }
