@@ -69,11 +69,14 @@ const wordBank = [
   { clue: "Opposite of lose", answer: "WIN" }
 ];
 
+
 function generatePuzzle() {
   let bestEntries = [];
   let bestQuality = -1;
+  let fallbackEntries = [];
+  let fallbackQuality = -1;
 
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (let attempt = 0; attempt < 250; attempt++) {
     const grid = Array.from({ length: rows }, () =>
       Array.from({ length: cols }, () => ({
         type: "empty",
@@ -96,15 +99,31 @@ function generatePuzzle() {
       }));
     }
 
+    function endpointFor(entry) {
+      return {
+        row: entry.clueRow +
+          (entry.direction === "down" ? entry.answer.length + 1 : 0),
+        col: entry.clueCol +
+          (entry.direction === "across" ? entry.answer.length + 1 : 0)
+      };
+    }
+
     function canPlace(entry, requireCrossing = true) {
       const clueCell = grid[entry.clueRow][entry.clueCol];
 
-      if (clueCell.type !== "empty") return 0;
+      // A word may start in an empty cell or a reserved endpoint.
+      if (
+        clueCell.type !== "empty" &&
+        clueCell.type !== "end"
+      ) {
+        return 0;
+      }
 
       let crossings = 0;
+      const points = pointsFor(entry);
 
       for (let i = 0; i < entry.answer.length; i++) {
-        const point = pointsFor(entry)[i];
+        const point = points[i];
 
         if (
           point.row < 0 || point.row >= rows ||
@@ -115,19 +134,41 @@ function generatePuzzle() {
 
         const cell = grid[point.row][point.col];
 
-        if (cell.type === "clue") return 0;
+        if (cell.type === "clue" || cell.type === "end") {
+          return 0;
+        }
 
         if (cell.type === "letter") {
-          if (cell.letter !== entry.answer[i]) return 0;
+          if (cell.letter !== entry.answer[i]) {
+            return 0;
+          }
+
           crossings++;
         }
       }
 
-     
+      const endpoint = endpointFor(entry);
 
+      // A word cannot end immediately before another letter.
+      if (
+        endpoint.row >= 0 && endpoint.row < rows &&
+        endpoint.col >= 0 && endpoint.col < cols &&
+        grid[endpoint.row][endpoint.col].type === "letter"
+      ) {
+        return 0;
+      }
 
-if (requireCrossing && crossings === 0) return 0;
-return crossings;
+      // New branches should cross existing letters.
+      // A reserved endpoint may also continue the clue chain.
+      if (
+        requireCrossing &&
+        crossings === 0 &&
+        clueCell.type !== "end"
+      ) {
+        return 0;
+      }
+
+      return crossings + (clueCell.type === "end" ? 1 : 0);
     }
 
     function addEntry(entry) {
@@ -147,6 +188,19 @@ return crossings;
         };
       }
 
+      const endpoint = endpointFor(entry);
+
+      if (
+        endpoint.row >= 0 && endpoint.row < rows &&
+        endpoint.col >= 0 && endpoint.col < cols &&
+        grid[endpoint.row][endpoint.col].type === "empty"
+      ) {
+        grid[endpoint.row][endpoint.col] = {
+          type: "end",
+          letter: ""
+        };
+      }
+
       const id = entry.direction === "across"
         ? `A${++acrossCount}`
         : `D${++downCount}`;
@@ -156,21 +210,20 @@ return crossings;
       crossingTotal += crossings;
     }
 
-    // Start near the centre.
     const seeds = wordBank.filter(word =>
       word.answer.length >= 4 &&
-      word.answer.length <= cols - 1
+      word.answer.length <= cols - 2
     );
 
     const seed = seeds[Math.floor(random() * seeds.length)];
 
-   addEntry({
-  direction: "across",
-  clueRow: Math.floor(rows / 2),
-  clueCol: cols - seed.answer.length - 1,
-  clue: seed.clue,
-  answer: seed.answer
-});
+    addEntry({
+      direction: "across",
+      clueRow: Math.floor(rows / 2),
+      clueCol: Math.floor((cols - seed.answer.length - 1) / 2),
+      clue: seed.clue,
+      answer: seed.answer
+    });
 
     while (placed.length < targetWords) {
       let bestCandidate = null;
@@ -204,7 +257,6 @@ return crossings;
 
               if (crossings === 0) continue;
 
-              // Prefer crossings, with a little randomness.
               const score =
                 crossings * 100 +
                 word.answer.length +
@@ -220,20 +272,45 @@ return crossings;
       }
 
       if (!bestCandidate) break;
+
       addEntry(bestCandidate);
     }
 
     const quality = placed.length * 100 + crossingTotal;
 
-    if (quality > bestQuality) {
+    // Keep a fallback so a failed attempt cannot erase the puzzle.
+    if (quality > fallbackQuality) {
+      fallbackQuality = quality;
+      fallbackEntries = placed;
+    }
+
+    // Every internal endpoint must become another word's clue.
+    const clueStarts = new Set(
+      placed.map(entry => `${entry.clueRow},${entry.clueCol}`)
+    );
+
+    const allEndsResolved = placed.every(entry => {
+      const endpoint = endpointFor(entry);
+
+      if (
+        endpoint.row < 0 || endpoint.row >= rows ||
+        endpoint.col < 0 || endpoint.col >= cols
+      ) {
+        return true;
+      }
+
+      return clueStarts.has(`${endpoint.row},${endpoint.col}`);
+    });
+
+    if (allEndsResolved && quality > bestQuality) {
       bestQuality = quality;
       bestEntries = placed;
     }
 
-    if (placed.length >= targetWords) break;
+    if (bestEntries.length >= targetWords) break;
   }
 
-  return bestEntries;
+  return bestEntries.length > 0 ? bestEntries : fallbackEntries;
 }
 
 const entries = generatePuzzle();

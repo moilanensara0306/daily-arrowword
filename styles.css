@@ -281,15 +281,18 @@ footer {
 }
 
 .clue-cell {
+  display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: stretch;
-  gap: 2px;
-  padding: 3px;
+  gap: 1px;
+  padding: 2px;
   background: #e8e5d8;
   border-color: #c9c5b5;
   color: #30352d;
   text-align: left;
+  min-width: 0;
+  min-height: 0;
 }
 
 .clue-cell.selected-clue {
@@ -308,10 +311,12 @@ footer {
 .clue-cell-text {
   display: block;
   width: 100%;
-  font-size: clamp(10px, 2.2vw, 13px);
-  line-height: 1.2;
+  min-width: 0;
+  font-size: clamp(5px, 1.3vw, 9px);
+  line-height: 1.05;
   font-weight: 700;
   overflow-wrap: anywhere;
+  word-break: normal;
   white-space: normal;
   overflow: hidden;
 }
